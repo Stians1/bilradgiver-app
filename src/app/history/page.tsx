@@ -1,32 +1,43 @@
-// src/app/history/page.tsx
 export const runtime = "nodejs";
-export const revalidate = 300;
+export const dynamic = "force-dynamic"; // kjør ved request, ikke under build
+export const revalidate = 0;
 
 import { getServiceClient } from "@/lib/supabaseServer";
 
-type ResultRow = {
-  id: string;
-  request_id: string;
-  created_at: string;
-  outputs: { perMonth: number; perKm: number };
-};
-
 export default async function Page() {
   const supabase = getServiceClient();
+
+  // Hent fra tabellen du faktisk har: tco_results (ikke "history")
   const { data, error } = await supabase
-    .from("history") // ← tilpass tabellnavn
-    .select("*")
-    .order("created_at", { ascending: false })
+    .from("tco_results")
+    .select("request_id, outputs") // legg til created_at hvis kolonnen finnes
     .limit(50);
 
   if (error) {
-    throw new Error(error.message);
+    console.error("[/history] supabase error:", error.message);
+    return (
+      <main className="p-6">
+        <h1 className="text-2xl font-semibold">History</h1>
+        <div className="mt-4 rounded border p-4 bg-amber-50">
+          Kunne ikke hente data nå.
+        </div>
+      </main>
+    );
   }
 
-  // Viktig: ikke send sensitive felter videre til klienten via props/JSX
   return (
-    <main className="p-6">
-      {/* render data uten hemmeligheter */}
+    <main className="p-6 space-y-4">
+      <h1 className="text-2xl font-semibold">History</h1>
+      <ul className="space-y-2">
+        {(data ?? []).map((row) => (
+          <li key={row.request_id} className="rounded border p-3 text-sm">
+            <div className="opacity-70">request_id: {row.request_id}</div>
+            <pre className="mt-2 bg-neutral-100 p-2 rounded">
+              {JSON.stringify(row.outputs, null, 2)}
+            </pre>
+          </li>
+        ))}
+      </ul>
     </main>
   );
 }

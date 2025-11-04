@@ -1,22 +1,43 @@
-export const revalidate = 300; // 5 min cache
+// src/app/tco/page.tsx
+export const runtime = "nodejs";
+export const revalidate = 300; // cache 5 min
 
-async function getData() {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL ?? ''}/api/dashboard-data`, {
+type TcoOut = { perMonth: number; perKm: number };
+
+async function getTco(): Promise<TcoOut> {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/api/calc-tco`, {
     next: { revalidate: 300 },
-    // Når du kjører på Vercel er SITE_URL satt; lokalt vil '' funke med relative URLer
   });
-  if (!res.ok) throw new Error('Kunne ikke hente dashboard-data');
+  if (!res.ok) throw new Error("Kunne ikke hente TCO");
   return res.json();
 }
 
 export default async function Page() {
-  const data = await getData();
-  // data forventes å inneholde market params/TCO-inputs fra din route
+  let tco: TcoOut | null = null;
+  try {
+    tco = await getTco();
+  } catch (e) {
+    // fallback – ikke krasj UI
+  }
+
   return (
-    <main className="p-6 space-y-6">
+    <main className="p-6 space-y-4">
       <h1 className="text-2xl font-semibold">TCO</h1>
-      <pre className="bg-neutral-100 p-4 rounded">{JSON.stringify(data, null, 2)}</pre>
-      {/* Bytt ut <pre> med faktisk UI når du vil */}
+      {tco ? (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="rounded p-4 border">
+            <div className="text-sm opacity-70">Per måned</div>
+            <div className="text-2xl font-bold">{Math.round(tco.perMonth).toLocaleString("no-NO")} kr</div>
+          </div>
+          <div className="rounded p-4 border">
+            <div className="text-sm opacity-70">Per km</div>
+            <div className="text-2xl font-bold">{tco.perKm.toFixed(2)} kr</div>
+          </div>
+        </div>
+      ) : (
+        <div className="p-4 rounded border bg-amber-50">Kunne ikke hente TCO akkurat nå. Prøv igjen om litt.</div>
+      )}
+      <div className="text-xs opacity-60">Oppdateres hver 5. min (ISR).</div>
     </main>
   );
 }

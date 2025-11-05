@@ -1,43 +1,66 @@
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic"; // kjør ved request, ikke under build
+export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 import { getServiceClient } from "@/lib/supabaseServer";
 
+type Row = {
+  request_id: string;
+  outputs: { perMonth?: number; perKm?: number } | null;
+  requests: { created_at: string } | null;
+};
+
+function fmtNok(n?: number | null) {
+  if (n == null || Number.isNaN(n)) return "–";
+  return Math.round(n).toLocaleString("no-NO") + " kr";
+}
+
 export default async function Page() {
   const supabase = getServiceClient();
 
-  // Hent fra tabellen du faktisk har: tco_results (ikke "history")
   const { data, error } = await supabase
     .from("tco_results")
-    .select("request_id, outputs") // legg til created_at hvis kolonnen finnes
-    .limit(50);
+    .select("request_id, outputs, requests(created_at)")
+    .order("created_at", { referencedTable: "requests", ascending: false })
+    .limit(50) as unknown as { data: Row[] | null, error: any };
 
   if (error) {
-    console.error("[/history] supabase error:", error.message);
-    return (
-      <main className="p-6">
-        <h1 className="text-2xl font-semibold">History</h1>
-        <div className="mt-4 rounded border p-4 bg-amber-50">
-          Kunne ikke hente data nå.
-        </div>
-      </main>
-    );
+    console.error("[history] supabase:", error.message);
   }
 
+  const rows = data ?? [];
+
   return (
-    <main className="p-6 space-y-4">
-      <h1 className="text-2xl font-semibold">History</h1>
-      <ul className="space-y-2">
-        {(data ?? []).map((row) => (
-          <li key={row.request_id} className="rounded border p-3 text-sm">
-            <div className="opacity-70">request_id: {row.request_id}</div>
-            <pre className="mt-2 bg-neutral-100 p-2 rounded">
-              {JSON.stringify(row.outputs, null, 2)}
-            </pre>
-          </li>
-        ))}
-      </ul>
+    <main className="p-6">
+      <h1 className="text-2xl font-semibold mb-4">History</h1>
+      <div className="text-sm opacity-70 mb-3">Siste 50 beregninger.</div>
+      <div className="border rounded overflow-hidden">
+        <div className="grid grid-cols-4 gap-2 p-2 bg-neutral-50 text-sm font-medium">
+          <div>Dato</div>
+          <div>Request ID</div>
+          <div>Per måned</div>
+          <div>Per km</div>
+        </div>
+        {rows.length === 0 ? (
+          <div className="p-4 text-sm">Ingen data ennå.</div>
+        ) : (
+          rows.map((r) => {
+            const perMonth = (r.outputs as any)?.perMonth ?? (r.outputs as any)?.result?.perMonth ?? null;
+            const perKm = (r.outputs as any)?.perKm ?? (r.outputs as any)?.result?.perKm ?? null;
+            const dt = r.requests?.created_at
+              ? new Date(r.requests.created_at).toLocaleString("no-NO")
+              : "–";
+            return (
+              <div key={r.request_id} className="grid grid-cols-4 gap-2 p-2 border-t text-sm">
+                <div>{dt}</div>
+                <div className="font-mono truncate" title={r.request_id}>{r.request_id}</div>
+                <div>{fmtNok(perMonth)}</div>
+                <div>{perKm != null ? Number(perKm).toFixed(2) + " kr" : "–"}</div>
+              </div>
+            );
+          })
+        )}
+      </div>
     </main>
   );
 }

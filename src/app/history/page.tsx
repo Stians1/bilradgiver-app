@@ -2,6 +2,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+import Link from "next/link";
 import { getServiceClient } from "@/lib/supabaseServer";
 
 type Row = {
@@ -53,7 +54,9 @@ export default async function Page() {
             return (
               <div key={r.request_id} className="grid grid-cols-4 gap-2 p-2 border-t text-sm">
                 <div>{dt}</div>
-                <div className="font-mono truncate" title={r.request_id}>{r.request_id}</div>
+                <div className="font-mono truncate" title={r.request_id}>
+                  <Link href={`/history/${r.request_id}`} className="underline">{r.request_id}</Link>
+                </div>
                 <div>{fmtNok(perMonth)}</div>
                 <div>{perKm != null ? Number(perKm).toFixed(2) + " kr" : "–"}</div>
               </div>
